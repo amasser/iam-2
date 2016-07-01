@@ -6,6 +6,7 @@ import (
 	"net/http"
 
 	"github.com/go-kit/kit/endpoint"
+	"github.com/go-kit/kit/log"
 	httptransport "github.com/go-kit/kit/transport/http"
 
 	"golang.org/x/net/context"
@@ -27,6 +28,10 @@ type authenticateResponse struct {
 
 type TokenRequest struct {
 	Token string `json:"token"`
+}
+
+type Response struct {
+	Err string `json:"err,omitempty"` // errors don't JSON-marshal, so we use a string
 }
 
 type createAccessKeyRequest struct {
@@ -68,6 +73,25 @@ func makeCreateAccessKeyEndpoint(svc AuthorizeService) endpoint.Endpoint {
 	}
 }
 
+func makeValidEndpoint(svc AuthorizeService) endpoint.Endpoint {
+	return func(ctx context.Context, request interface{}) (interface{}, error) {
+		req := request.(TokenRequest)
+		err := svc.Valid(req.Token)
+		if err != nil {
+			return Response{err.Error()}, nil
+		}
+		return Response{""}, nil
+	}
+}
+
+func decodeValidRequest(_ context.Context, r *http.Request) (interface{}, error) {
+	var request TokenRequest
+	if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
+		return nil, err
+	}
+	return request, nil
+}
+
 func decodeAuthenticateRequest(_ context.Context, r *http.Request) (interface{}, error) {
 	var request authenticateRequest
 	if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
@@ -84,12 +108,11 @@ func decodeAccessKeyRequest(_ context.Context, r *http.Request) (interface{}, er
 	return request, nil
 }
 
-func AuthenticateHandler() *httptransport.Server {
+func AuthenticateHandler(logger log.Logger) *httptransport.Server {
 	var svc AuthorizeService
 	ctx := context.Background()
 	svc = authorizeService{}
-	// logger := log.NewLogfmtLogger(os.Stderr)
-	// svc = loggingMiddleware{logger, svc}
+	svc = loggingMiddleware(logger)(svc)
 
 	return httptransport.NewServer(
 		ctx,
@@ -99,17 +122,30 @@ func AuthenticateHandler() *httptransport.Server {
 	)
 }
 
-func CreateAccessKeyHandler() *httptransport.Server {
+func CreateAccessKeyHandler(logger log.Logger) *httptransport.Server {
 	var svc AuthorizeService
 	ctx := context.Background()
 	svc = authorizeService{}
-	// logger := log.NewLogfmtLogger(os.Stderr)
-	// svc = loggingMiddleware{logger, svc}
+	svc = loggingMiddleware(logger)(svc)
 
 	return httptransport.NewServer(
 		ctx,
 		makeCreateAccessKeyEndpoint(svc),
 		decodeAccessKeyRequest,
+		encodeResponse,
+	)
+}
+
+func ValidHandler(logger log.Logger) *httptransport.Server {
+	var svc AuthorizeService
+	ctx := context.Background()
+	svc = authorizeService{}
+	svc = loggingMiddleware(logger)(svc)
+
+	return httptransport.NewServer(
+		ctx,
+		makeValidEndpoint(svc),
+		decodeValidRequest,
 		encodeResponse,
 	)
 }
