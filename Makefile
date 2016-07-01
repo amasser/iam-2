@@ -8,5 +8,5 @@ run: build
 	./iamserver
 
 init: 
-	@rm iam.db
+	@-rm iam.db
 	@./iamserver initdb 

@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"github.com/boltdb/bolt"
-	"log"
+	_ "log"
 	"time"
 )
 
