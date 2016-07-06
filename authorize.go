@@ -60,7 +60,9 @@ func createToken(tx *bolt.Tx, id string) (string, error) {
 	expireAt := now.Add(ExpireTime)
 
 	err = b.Put([]byte(token+":id"), []byte(id))
-	err = b.Put([]byte(token+":expire_at"), []byte(expireAt.String()))
+
+	bytesTime, _ := expireAt.MarshalBinary()
+	err = b.Put([]byte(token+":expire_at"), bytesTime)
 	err = expireKey(tx, "Token", token+":id", expireAt)
 	err = expireKey(tx, "Token", token+":expire_at", expireAt)
 
@@ -69,7 +71,8 @@ func createToken(tx *bolt.Tx, id string) (string, error) {
 
 func expireKey(tx *bolt.Tx, bucket, key string, expireAt time.Time) error {
 	b := tx.Bucket(BucketExpires)
-	return b.Put([]byte(bucket+":"+key), []byte(expireAt.String()))
+	bytesTime, _ := expireAt.MarshalBinary()
+	return b.Put([]byte(bucket+":"+key), bytesTime)
 }
 
 func valid(token string) error {
@@ -86,7 +89,7 @@ func valid(token string) error {
 			}
 
 			if string(k) == token+":expire_at" {
-				expireAt, _ = time.Parse("2006-01-02 15:04:05.999999999 -0700 MST", string(v))
+				expireAt.UnmarshalBinary(v)
 			}
 
 			if len(id) > 0 && !expireAt.IsZero() {

@@ -21,6 +21,7 @@ var (
 	TokenInvalid     = errors.New("token is invalid")
 	TokenExpired     = errors.New("token is expired")
 	DBError          = errors.New("can't access database")
+	RequestMismatch  = errors.New("request struct is mismatch")
 	ExpireTime       = time.Duration(2) * time.Hour
 )
 
@@ -64,5 +65,8 @@ func (authorizeService) CreateAccessKey(id, secret string) error {
 }
 
 func (authorizeService) Valid(token string) error {
+	if len(token) == 0 {
+		return errors.New("null token")
+	}
 	return valid(token)
 }
